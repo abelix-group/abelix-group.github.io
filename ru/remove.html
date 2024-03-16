@@ -310,16 +310,10 @@
       </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/apollo-client@3.5.6/"></script>
-    <script src="https://cdn.jsdelivr.net/npm/graphql-tag@2.12.2/"></script>
     <script src="https://unpkg.com/imask"></script>
 
     <script>
-      const client = new ApolloClient({
-        uri: 'http://185.22.65.94/graphql',
-      });
-
-      console.log('client', client)
+      let phoneNumber = ''
 
       const phoneNumberInput = document.getElementById('phone-number');
       IMask(phoneNumberInput, {
@@ -341,9 +335,9 @@
         e.preventDefault();
 
         const data = formDataToJson(new FormData(reasonForm))
-        post('', data, function() {
-          openModal(document.getElementById('otp-modal'))
-        })
+        phoneNumber = String(data.phoneNumber).replace(/\D/g, '')
+        requestDeleteUser(phoneNumber)
+          .then(() => openModal(document.getElementById('otp-modal')))
       })
 
       const otpForm = document.getElementById('otp-form')
@@ -351,10 +345,11 @@
         e.preventDefault();
 
         const data = formDataToJson(new FormData(otpForm))
-        post('', data, function() {
-          closeModal(document.getElementById('otp-modal'))
-          openModal(document.getElementById('success-modal'))
-        })
+        requestVerify(phoneNumber, data.otp)
+          .then(() => {
+            closeModal(document.getElementById('otp-modal'))
+            openModal(document.getElementById('success-modal'))
+          })
       })
 
       const modalCloseBtns = document.querySelectorAll('.modal .modal-close');
@@ -420,11 +415,8 @@
         }, 1000);
 
         span.textContent = '(' + seconds + 'c)';
-        const data = formDataToJson(new FormData(reasonForm))
-        post('', data, function() {
-        })
-    });
-
+        requestDeleteUser(phoneNumber)
+      });
 
       // Convert FormData to JSON object
       function formDataToJson(formData) {
@@ -442,27 +434,36 @@
         return jsonObject;
       }
 
-      function post(url, data, callback) {
-        console.log('data', data)
-        setLoading(true)
+      const requestDeleteUser = (phoneNumber) => {        
+        const requestBody = {"operationName":"DeleteUser","variables":{"phoneNumber":phoneNumber},"query":"mutation DeleteUser($phoneNumber: String!) {\n  requestDeleteUser(data: {phoneNumber: $phoneNumber}) {\n    message\n  }\n}\n"}
+        return post(requestBody)
+      }
 
-        setTimeout(() => {
-          setLoading(false);
-          if (callback) {
-            callback()
-          } 
-        }, 1000)
-        
-        // fetch(url, {
-        //   method: 'POST',
-        //   headers: {
-        //     'Content-Type': 'application/json'
-        //   },
-        //   body: JSON.stringify(data),
-        // })
-        // .then((res) => res.json())
-        // .then((res) => callback(res))
-        // .finally(() => setLoading(false))
+      const requestVerify = (phoneNumber, otp) => {
+        const requestBody = {"operationName":"VerifyDeleteUser","variables":{"phoneNumber":phoneNumber,"otp":otp},"query":"mutation VerifyDeleteUser($phoneNumber: String!, $otp: String!) {\n  verifyDeleteUserOtp(data: {phoneNumber: $phoneNumber, otp: $otp}) {\n    message\n  }\n}\n"}
+        return post(requestBody)
+      }
+
+      function post(data) {
+        setLoading(true)
+        return new Promise((resolve) => {
+          fetch('http://185.22.65.94/graphql', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data),
+          })
+          .then((res) => res.json())
+          .then((res) => {
+            setLoading(false)
+            if (res.errors) {
+              openModal(document.getElementById('error-modal'))
+            } else {
+              resolve()
+            }
+          })
+        })
       }
     </script>
   </body>
